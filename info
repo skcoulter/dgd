@@ -1,0 +1,24 @@
+
+Files
+=====
+dgd:		init script (systemv)
+dgd_init.pm:	daemon initialization code
+dgdcfg:		dgd configuration file - needs to be modified for each system
+dgd.pl:		main daemon code
+dgd.1.gz	man page
+dgd.service	init script (systemd)
+dgd.spec	RPM spec file
+
+Building
+========
+Tar file for RPM build needs to include the dgd-2.0.0 directory.
+
+This example is from LANL:
+
+i.e.  	from /usr/projects/hpc3-infrastructure/src/DGD
+      		tar cvf dgd-2.0.0.tar dgd-2.0.0 --exclude=RCS
+	then
+		gzip dgd-2.0.0.tar
+
+Move the resulting file, dgd-2.0.0.tar.gz, to the sources directory:
+	/usr/projects/hpc3-infrastructure/rpmbuild/DGD/SOURCES	

@@ -1,0 +1,114 @@
+# Drivers for DeadGatewayDetection setup and processing
+# Format is VARIABLE value (one space between key and value)
+# DEBUG is first to avoid printing stuff from variables alphabetically before DEBUG
+#
+# 0 live 
+# 1 live with lots of messages
+# 2 dry run with lot of messages
+DEBUG 2
+
+# compute image name in nodes.conf and /var/lib/perceus/vnfs
+COMPUTE_IMAGE compute
+
+# length of node name in /etc/perceus/nodes.conf
+CUT_PARAM_COMP x
+CUT_PARAM_IO x
+
+# name of IPoIB NIC
+IB_NIC ib0
+
+# name of IO node ethernet NIC
+IO_CAMPUS_NIC eth2
+
+# IO image name in nodes.conf and /var/lib/perceus/vnfs
+IO_IMAGE io
+
+# name of file for IOLOG_MSGS
+IOLOG_FILENAME /tmp/dgd_iolog
+
+# log patterns and limits
+# valid only when IO_NODE_LOG test is activated
+# format is message::limit,another message::limit  etc.
+# out of band process requred to configure syslog-ng to pull these logs
+#     logs are placed into /tmp/dgd_iolog
+IOLOG_MSGS transmit timeout::10,queue stopped::10 
+ 
+# gateway for campus connection on host DGD runs from
+LOCAL_CAMPUS_GW 10.11.10.94
+
+# set to correct command if LNet service is running on the IO nodes
+#LUSTRE_SVC /etc/init.d/lnet  (RH7 example)
+
+# threshold for total IOs marked inactive
+# could be larger problem and/or performance may suffer
+MAX_DEAD_IOS 3
+
+# number of consecutive complete failures for any one ping test
+#  this number indicates a failed IO node
+MAX_FAIL 3
+
+# number of consecutive partial failures for any one ping test
+#  this number indicates a failed IO node
+MAX_PARTIAL_FAIL 5
+
+# yes this can be discovered, but ...
+# some clusters still have CU segment letter
+NODE_PREFIX xx
+
+# number of packets sent as ping test
+NUM_PING_PKTS 4
+
+# how parallel should pexec be
+PARALLEL_PEXEC 32
+
+# maximum number of compute nodes for random pings
+PING_MAX 20
+
+# percent of compute nodes chosen for random pings
+PING_PERCENT .1
+
+# size of ping packets
+PING_SIZE 56
+ 
+# set to correct command for routing service (OSPF)
+# #ROUTER_SVC /usr/sbin/ospfd  (RH7-example)
+ROUTER_SVC service ospfd
+
+# threshold for concurrent IOs marked inactive
+# indicative something whack is going on
+# don't mitigate, send critical message
+SANITY_CHECK x
+
+# secondary gateway
+#SECONDARY_GW 172.17.72.254
+#SECONDARY_NIC dcm
+
+# Skip filename
+SKIP_FILENAME /etc/ON_DST
+ 
+# sleep time between test loops
+SLEEP 2700
+
+# seconds to wait on ssh connection
+SSH_TIMEOUT 10
+
+# seconds to wait before timing out on pexec
+# 	used to allow for long running ethcfg
+TIMEOUT_PEXEC 300
+
+#====================================================
+# Tests
+#   The order of the tests drives the execution order
+#====================================================
+
+TEST_OSPF_LOGS 1
+TEST_COMPUTE_TO_SWITCH_GW 1
+TEST_COMPUTE_TO_LUSTRE 1
+TEST_IO_NODE_DMESG 0
+TEST_IO_NODE_NETSTAT 0
+TEST_IO_NODE_LOG 1
+TEST_IO_NODE_TO_CAMPUS 0
+TEST_CAMPUS_TO_IO_ETH 1
+TEST_INTERNAL_TO_IO_IB 1
+TEST_COMPUTE_TO_SEC 0
+TEST_COMPUTE_TO_SEC_GW 0

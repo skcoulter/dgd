@@ -1,0 +1,199 @@
+#!/bin/bash
+#
+# chkconfig: 345 99 05
+# description: dgd monitors the IO nodes for health (DeadGatewayDetection)
+
+# source function library
+. /etc/init.d/functions
+
+# Check that networking is up.
+#[ "${NETWORKING}" = "no" ] && exit 0
+
+RETVAL=0
+NAME=dgd
+DESC="Dead Gateway Dectection"
+PIDFILE=/var/run/$NAME.pid
+
+#=====================================================================================
+
+start()
+{
+	echo "Starting $NAME:"
+	if [ -f /usr/sbin/dgd.pl ]; then
+		echo "Binary found"
+		if [ -f $PIDFILE ]; then
+			echo "$PIDFILE exists - FAIL"
+		else
+			PID=`/usr/sbin/dgd.pl & echo $!`
+			RETVAL=$?
+			if [ $RETVAL -eq 0 ]; then
+				echo "Process launched, creating $PIDFILE"
+				PID=`/bin/ps -C dgd.pl -o pid=`
+	        		if [ -z $PID ]; then
+	            			echo "No PID - FAIL"
+	        		else
+	            			echo $PID > $PIDFILE
+	            			echo "$PIDFILE creeated - SUCCESS"
+	        		fi
+			else
+				echo "Process returned nonzero result: $RETVAL - FAIL"
+			fi
+		fi
+		
+	fi
+	return
+}
+
+stop()
+{
+        echo "Stopping $NAME:"
+	if [ -f $PIDFILE ]; then
+		PID=`/bin/cat $PIDFILE`
+		kill $PID
+		RETVAL=$?
+		if [ $RETVAL -eq 0 ]; then
+	        	echo "Kill command executed - SUCCESS"
+			rm -f $PIDFILE
+	        	RETVAL=$?
+			if [ $RETVAL -ne 0 ]; then
+				echo "Removal of pidfile, $PIDFILE - FAIL"
+			fi
+		else
+			echo "Kill command failed: $RETVAL - FAIL"
+		fi
+	else
+	        echo "Pidfile not found - FAIL"
+        fi
+	return
+}
+
+status()
+{
+        echo "Checking $NAME:"
+	        if [ -f $PIDFILE ]; then
+	            PID=`cat $PIDFILE`
+	            if [ -z "`ps -ef | grep ${PID} | grep -v grep`" ]; then
+	                echo "Process dead but pidfile exists - FAIL"
+	            else
+	                echo "Running - sending signal to get status"
+	                echo "Check syslog for details, grep for dump_health_handler"
+			echo "Signal sent: kill -s USR2 $PID"
+			kill -s USR2 $PID
+	                RETVAL=$?
+        	        if [ $RETVAL -ne 0 ]; then
+				echo "Signal send failed"
+			fi
+	            fi
+	        else
+	            echo "Service not running"
+	        fi
+	return
+}
+
+reload()
+{
+        echo "Reloading $NAME:"
+                if [ -f $PIDFILE ]; then
+                    PID=`cat $PIDFILE`
+                    if [ -z "`ps -ef | grep ${PID} | grep -v grep`" ]; then
+                        echo "Process dead but pidfile exists - FAIL"
+                    else
+                        echo "Signal sent: kill -s HUP $PID"
+                        kill -s HUP $PID
+                        RETVAL=$?
+                        if [ $RETVAL -eq 0 ]; then
+                                echo "Reload - SUCESS"
+			else
+				echo "Reload - FAIL"
+                        fi
+                    fi
+                else
+                    echo "Service not running - FAIL"
+                fi
+        return
+}
+
+wakeup()
+{
+        echo "Waking Up $NAME:"
+                if [ -f $PIDFILE ]; then
+                    PID=`cat $PIDFILE`
+                    if [ -z "`ps -ef | grep ${PID} | grep -v grep`" ]; then
+                        echo "Process dead but pidfile exists - FAIL"
+                    else
+                        echo "Signal sent: kill -s INT $PID"
+                        kill -s INT $PID
+                        RETVAL=$?
+                        if [ $RETVAL -eq 0 ]; then
+                                echo "Wakeup - SUCESS"
+			else
+				echo "Wakeup - FAIL"
+                        fi
+                    fi
+                else
+                    echo "Service not running - FAIL"
+                fi
+        return
+}
+
+suspend()
+{
+        echo "Suspending $NAME:"
+                if [ -f $PIDFILE ]; then
+                    PID=`cat $PIDFILE`
+                    if [ -z "`ps -ef | grep ${PID} | grep -v grep`" ]; then
+                        echo "Process dead but pidfile exists - FAIL"
+                    else
+                        echo "Signal sent: kill -s USR1 $PID"
+                        kill -s USR1 $PID
+                        RETVAL=$?
+                        if [ $RETVAL -eq 0 ]; then
+                                echo "Suspend - SUCESS"
+			else
+				echo "Suspend - FAIL"
+                        fi
+                    fi
+                else
+                    echo "Service not running - FAIL"
+                fi
+        return
+}
+
+
+
+
+#=====================================================================================
+
+case "$1" in
+        restart)
+                stop
+                start
+                ;;
+        start)
+                start
+                ;;
+
+        stop)
+                stop
+                ;;
+
+	reload)
+		reload
+		;;
+
+	suspend)
+		suspend
+		;;
+
+	wakeup)
+		wakeup
+		;;
+
+        status)
+                status
+        ;;
+
+  *)
+   echo "Usage: $0 {start|stop|status|restart|reload|suspend|wakeup}"
+esac
+

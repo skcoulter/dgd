@@ -1,0 +1,97 @@
+.TH DGD 1
+.SH NAME
+dgd \- run tests as specified by a configuration file to test and validate the IO subsystem of a cluster
+.SH SYNOPSIS
+.B dgd
+start
+stop
+status
+restart
+reload
+wakeup
+suspend
+.SH DESCRIPTION
+.B dgd
+The DGD process runs as a daemon, launched at boot time. 
+It uses the /etc/sysconfig/dgdcfg configuration file to discover and set up its environment. 
+It keeps a stateful representation of various parts of the subsystem and the perceived health of those entities. 
+Messages are sent to syslog when various tests fail.  Those messages are prefaced with DeadGatewayDetection.
+.LP
+Tests specific to an IO node will take that IO node out of the compute routes if/when that IO node is deemed faulty.
+The DGD process refers to the state of a faulty IO node as INACTIVE.
+When an IO node is deemed INACTIVE, the OSPF daemon, LNet process (if applicable) and the IP emulation interface on the internal cluster highspeed connection on that IO node are shut down.
+Shutting down the OSPF daemon stops that node from advertising itself as a router for the cluster.
+Shutting down the LNet process insures that the Lustre server, as well as the Lustre client, no longer see the IO node as a viable router.
+Shutting down the IP emulation on the internal cluster highspeed interface is the mechanism by which that IO node is removed from the compute node routes. 
+The DGD process uses the ethcfg process on the compute nodes, with the --force flag, to modify the compute node routes, resulting in the removal of that IO node from the compute node route due to an inability to ping its IP emulation interface.
+
+The cleanest way to return an IO node to service is via a reboot.  This normally happens as part of the trouble shooting process.
+If, however, the node is considered fixed without a reboot; best practice is to reboot the node anyway.
+.LP
+Watching the syslog output can indicate when the process is sleeping.
+Best practice is to wait until the process is sleeping, reboot the node, then send the process the wakeup signal to start its testing.
+.LP
+There are 2 files that will prevent DGD from running any tests. 
+One is specified in the configuration file as the SKIP_FILENAME.  This file is created by the DST wrapper and stops DGD from runnging during DSTs.
+It could be created for any reason to prevent the tests from running.
+The other is /etc/INSANE, which gets created when the SANITY_CHECK logic is triggered.
+The SANITY_CHECK logic is triggered when too many IO nodes are deemed INACTIVE by the same test during the same loop. 
+This should allow the process to identify when something is seriously awry. 
+When this happens, all the health hashes are re-initialized, so the state will be lost.
+This is done because the process has been deemed untrustworthy, and therefore the state cannot be trusted.
+The nodes that triggered this process are all returned to the ACTIVE state.
+When the SANITY_CHECK logic is triggered, DGD renders itself useless until an administrator checks the system and removes the /etc/INSANE flag.
+.LP
+The DGD process never modifies routes on the IO nodes.
+.SH OPTIONS
+.TP
+.BR start
+Start the daemon. Can be done via systemctl command on SystemD.  Can be done via service command on SystemV.
+.TP
+.BR stop
+Stop the daemon. Can be done via systemctl command on SystemD.  Can be done via service command on SystemV.
+.TP
+.BR status
+Report on the status of the daemon. This also dumps the current state of the health of the IO subsystem as seen by dgd.
+On SystemD use `/usr/libexec/dgd status`.  Can be done via service command on SystemV.
+.TP
+.BR restart
+Stop and then start the daemon.  This will re-initialized the state of the health of the IO subsystem as seen by dgd.
+On SystemD use `/usr/libexec/dgd restart`.  Can be done via service command on SystemV.
+.TP
+.BR reload
+Reread the configuration file.
+On SystemD use `/usr/libexec/dgd reload`. Can be done via service command on SystemV.
+The following values can be changed without losing state.
+.IP
+TESTS: The flags indicating which tests should be performed can be modified
+.IP
+DEBUG: Debug level of the process
+.IP
+IOLOG_FILENAME: Name of the file to search for error messages specified in IOLOG_MSGS.  This file is created by an Arch Team process.
+.IP
+IOLOG_MSGS: List of error messages to look for in IOLOG_FILENAME
+.IP
+LOCAL_CAMPUS_GW: IP address of the campus gateway used by the master node
+.IP
+MAX_DEAD_IOS: Number of IO nodes that cause a CRITICAL message to be logged
+.IP
+MAX_FAIL: Threshold for consecutive 100% ping test failures
+.IP
+MAX_PARTIAL_FAIL Threshold for consecutive ping test failures > 0 and < 100%
+.IP
+PING_SIZE: Size of the ping packet used on the connectivity tests
+.IP
+SANITY_CHECK: Number of IO nodes taken out by one test on one pass that should be interpreted as a bogus.  This assumes the process has failed in some way.  No IO nodes are marked as INACTIVE and a CRITICAL message is sent to alert the admininstrators of the system.  The process is stalled by creating an /etc/INSANE file, which is checked on each pass along with the SKIP_FILENAME.
+.IP
+SKIP_FILENAME: The name of the file used to tell DGD that it should skip running the tests until that file is removed.
+.IP
+SLEEP: The amount of time to sleep between test loops.
+.TP
+.BR wakeup
+Wakes the process up from sleep and starts the tests.  This can be used to reduce the time between fixing an IO node, and bringing it back into use.  This signal is only honored when the process is currently sleeping; it is not honored when actively running tests.
+On SystemD use `/usr/libexec/dgd wakeup`. Can be done via service command on SystemV.
+.TP
+.BR suspend
+Sends the process to sleep.  This can be used to provide time for the IO node to be fixed and rebooted.
+On SystemD use `/usr/libexec/dgd suspend`. Can be done via service command on SystemV.

@@ -1,0 +1,13 @@
+[Unit]
+Description=DGD: Dead Gateway Detection Daemon
+Documentation=man:dgd(1)
+After=systemd-modules-load.service syslog.target network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/libexec/dgd start
+ExecStop=/usr/libexec/dgd stop
+
+[Install]
+WantedBy=network-online.target
+

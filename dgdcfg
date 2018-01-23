@@ -37,7 +37,13 @@ IOLOG_MSGS transmit timeout::10,queue stopped::10
 LOCAL_CAMPUS_GW 10.11.10.94
 
 # set to correct command if LNet service is running on the IO nodes
-#LUSTRE_SVC /etc/init.d/lnet  (RH7 example)
+# if systemd, use systemctl:unitname as the format
+# if systemd, and more than one service required 
+#    use systemctl:unitnamestart:unitnamestartnext
+#    the stop process will do the reverse
+#LUSTRE_SVC /etc/init.d/lnet     (RH6 example)
+#LUSTRE_SVC systemctl:lustre.ko  (RH7 example)
+#LUSTRE_SVC systemctl:lustre.ko:rlustre  (pain in the backside RH7 example)
 
 # threshold for total IOs marked inactive
 # could be larger problem and/or performance may suffer

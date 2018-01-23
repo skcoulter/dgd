@@ -28,10 +28,10 @@ unshift (@INC, "/usr/bin");
 use Sys::Syslog;
 
 sub set_environment {
+  my $fname = "set_environment";
+  my ($svc,$unit,$unit1,$unit2);
 
   &check_status;
-
-  my $fname = "set_environment";
 
   $ENV{HOME} = "/root";
   $ENV{USER} = "root";
@@ -65,7 +65,7 @@ sub set_environment {
 
 # read configuration file
 
-  read_config();
+  &read_config();
 
 #=====================  perceus specific  =================================
 
@@ -104,6 +104,30 @@ sub set_environment {
     $SEC_GW[0] = $cfg{SECONDARY_GW};
   }
 
+# set iolog fail name for saving a copy
+
+  $FAILED_IOLOG_FILENAME = "$cfg{IOLOG_FILENAME}_FAILED";
+
+# set Lustre service commands
+
+  if ($cfg{LUSTRE_SVC} =~ /systemctl/) {
+    ($svc,$unit) = split(/:/,$cfg{LUSTRE_SVC}, 2);
+    if ($unit =~ /:/) {
+      ($unit1,$unit2) = split(/:/,$unit);
+      $LUSTRE_SVC_START = "\"$svc start $unit1;$svc start $unit2\"";
+      $LUSTRE_SVC_STATUS = "$svc status $unit1";
+      $LUSTRE_SVC_STOP = "\"$svc stop $unit2;$svc stop $unit1\"";
+    } else {
+      $LUSTRE_SVC_START = "$svc start $unit";
+      $LUSTRE_SVC_STATUS = "$svc status $unit";
+      $LUSTRE_SVC_STOP = "$svc stop $unit";
+    }
+  } else {
+    $LUSTRE_SVC_START = "$cfg{LUSTRE_SVC} start";
+    $LUSTRE_SVC_STATUS = "$cfg{LUSTRE_SVC} status";
+    $LUSTRE_SVC_STOP = "$cfg{LUSTRE_SVC} stop";
+  }
+
 #===================   IP address arrays   ============================
 
   @IO_IB_IPS = split(/\n/,`for x in \`grep $cfg{IO_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{IB_NIC} | grep address | sed 's/.*has address //'\;done`);
@@ -116,9 +140,21 @@ sub set_environment {
 
   @COMPUTE_CVLAN_IPS = split(/\n/,`for x in \`grep $cfg{COMPUTE_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_comp | xargs\`\; do host \${x} | grep address | sed 's/.*has address //'\;done`);
 
-if ($cfg{SECONDARY_NIC}) {
-  @IO_SEC_IPS = split(/\n/,`for x in \`grep $cfg{IO_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{SECONDARY_NIC} | grep address | sed 's/.*has address //'\;done`);
-}
+  if ($cfg{SECONDARY_NIC}) {
+    @IO_SEC_IPS = split(/\n/,`for x in \`grep $cfg{IO_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{SECONDARY_NIC} | grep address | sed 's/.*has address //'\;done`);
+  }
+
+# verify IO node arrays have the correct number of entries
+
+  if (scalar(@IO_IB_IPS) != $NUM_IO_NODES) {
+    &syslog_write("info","$fname: CRITICAL Number of IO node IB IPs does not match NUM_IO_NODES");
+  }
+  if (scalar(@IO_CVLAN_IPS) != $NUM_IO_NODES) {
+    &syslog_write("info","$fname: CRITICAL Number of IO node CVLAN IPs does not match NUM_IO_NODES");
+  }
+  if (scalar(@IO_TENGIG_IPS) != $NUM_IO_NODES) {
+    &syslog_write("info","$fname: CRITICAL Number of IO node Ethernet IPs does not match NUM_IO_NODES");
+  }
 
 # array of IO gateways
 # gw always one less than the broadcast

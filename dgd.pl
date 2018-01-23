@@ -84,11 +84,15 @@ our $ACTIVE;
 our $COMP_RANGE;
 our $ETHCFG_REDO;
 our $ETHCFG_SVC_START;
+our $FAILED_IOLOG_FILENAME;
 our $INACTIVE;
 our $INACTIVE_COMPLETE;
 our $INACTIVE_PARTIAL;
 our $INSANE;
 our $IO_RANGE;
+our $LUSTRE_SVC_START;
+our $LUSTRE_SVC_STATUS;
+our $LUSTRE_SVC_STOP;
 our $NUMTESTS;
 our $NUM_COMP_NODES;
 our $NUM_DEAD_IOS;
@@ -335,7 +339,7 @@ sub check_for_state_change {
 
       if ($IO_Node_Health[$i] == $INACTIVE) {
         $IO_Node_Health[$i] = $ACTIVE;
-        $msg = "$fname: CRITICAL - Status of IO Node $n has changed to ACTIVE";
+        $msg = "$fname: CRITICAL - IO Node $n has changed to ACTIVE";
         &syslog_write("info", $msg, "");
         $NUM_DEAD_IOS--;
         $route_mods++;
@@ -343,19 +347,14 @@ sub check_for_state_change {
       }
     } else {
 
-# if this IO node was previously ACTIVE,
-#    something on the IO node is broken 
-#    mark it as down,increment route mod counter,write details  
+# if this IO node was previously ACTIVE, something on the IO node is broken 
+#    mark it as down,increment dead io counter, write details to syslog 
+#    take appropriate actions on the node, set sanity and increment route mod counter
 
       if ($IO_Node_Health[$i] == $ACTIVE) {
         $IO_Node_Health[$i] = $INACTIVE;
         $NUM_DEAD_IOS++;
-        &node_down($i);
-        $sanity[$i] = 1;
-        $route_mods++;
-        $msg = "$fname: CRITICAL - Status of IO Node $n has changed to INACTIVE";
-        &syslog_write("info", $msg, "");
-        $msg = "$fname: Status details for INACTIVE node $n are ";
+        $msg = "$fname: CRITICAL - IO Node $n has changed to INACTIVE. Status details are ";
         $msg .= "IB/$STAT[$IB_Health{$IO_IB_IPS[$i]}->{STAT}], ";
         $msg .= "10G/$STAT[$TenGig_Health{$IO_TENGIG_IPS[$i]}->{STAT}], ";
         $msg .= "GW/$STAT[$GW_Health{$IO_GW_IPS[$i]}->{STAT}], ";
@@ -365,7 +364,10 @@ sub check_for_state_change {
           $msg .= "SECONDARY/$STAT[$SEC_Health{$IO_SEC_IPS[$i]}->{STAT}]";
         }
         &syslog_write("info", $msg);
-      } 
+        &node_down($i);
+        $sanity[$i] = 1;
+        $route_mods++;
+      }
       
 # write status message
 # verify state after all tests complete
@@ -384,6 +386,7 @@ sub check_for_state_change {
 #   something whacky is going on
 
   if ($route_mods >= $cfg{SANITY_CHECK}) {
+     $route_mods = 0;
      &syslog_write("info", "$fname: CRITICAL - Sanity threshold of $cfg{SANITY_CHECK} exceeded", "");
      for ($i=0; $i <= $NUM_IO_NODES-1; $i++) {     
        if ($sanity[$i]) {
@@ -410,54 +413,56 @@ sub check_for_state_change {
      system("$ETHCFG_REDO");
   }
 
-# report failures/fixes for gateways
+# only after all tests are complete ...
+#   report failures/fixes for gateways
 
-  $num_gws = @IO_GW_IPS;
-  for ($i=0; $i < $num_gws; $i++) {
-    if ($GW_Health{$IO_GW_IPS[$i]}->{STAT} > 0) {
-      $GW_Health{$IO_GW_IPS[$i]}->{HLTH} = $INACTIVE;
-      $msg = "$fname: CRITICAL - ping failed to GW $IO_GW_IPS[$i] - $STAT[$GW_Health{$IO_GW_IPS[$i]}->{STAT}] ";
+  if ($all_tests_complete) {
+    $num_gws = @IO_GW_IPS;
+    for ($i=0; $i < $num_gws; $i++) {
+      if ($GW_Health{$IO_GW_IPS[$i]}->{STAT} > 0) {
+        $GW_Health{$IO_GW_IPS[$i]}->{HLTH} = $INACTIVE;
+        $msg = "$fname: CRITICAL - ping failed to GW $IO_GW_IPS[$i] - $STAT[$GW_Health{$IO_GW_IPS[$i]}->{STAT}] ";
+        &syslog_write("info", $msg, "");
+      } else {
+        if ($GW_Health{$IO_GW_IPS[$i]}->{HLTH} == $INACTIVE) {
+          $GW_Health{$IO_GW_IPS[$i]}->{HLTH} = $ACTIVE;
+          $msg = "$fname: CRITICAL - previously failed ping now successful to GW $IO_GW_IPS[$i]";
+          &syslog_write("info", $msg, "");
+        }
+      }
+    }
+
+#   report failures/fixes for secondary gateway
+
+    if ($SECGW_Health{$cfg{SECONDARY_GW}}->{STAT} > 0) {
+      $SECGW_Health{$cfg{SECONDARY_GW}}->{HLTH} = $INACTIVE;
+      $msg = "$fname: CRITICAL - ping failed to SEC GW $cfg{SECONDARY_GW}";
       &syslog_write("info", $msg, "");
     } else {
-      if ($GW_Health{$IO_GW_IPS[$i]}->{HLTH} == $INACTIVE) {
-        $GW_Health{$IO_GW_IPS[$i]}->{HLTH} = $ACTIVE;
-        $msg = "$fname: FIXED previously failed ping now successful to GW $IO_GW_IPS[$i]";
+      if ($SECGW_Health{$cfg{SECONDARY_GW}}->{HLTH} == $INACTIVE) {
+        $SECGW_Health{$cfg{SECONDARY_GW}}->{HLTH} = $ACTIVE;
+        $msg = "$fname: CRITICAL - previously failed ping now successful to SECGW $cfg{SECONDARY_GW}";
         &syslog_write("info", $msg, "");
       }
     }
-  }
 
-# report failures/fixes for secondary gateway
+#   report failures/fixes for LNet routers
 
-  if ($SECGW_Health{$cfg{SECONDARY_GW}}->{STAT} > 0) {
-    $SECGW_Health{$cfg{SECONDARY_GW}}->{HLTH} = $INACTIVE;
-    $msg = "$fname: CRITICAL - ping failed to SEC GW $cfg{SECONDARY_GW}";
-    &syslog_write("info", $msg, "");
-  } else {
-    if ($SECGW_Health{$cfg{SECONDARY_GW}}->{HLTH} == $INACTIVE) {
-      $SECGW_Health{$cfg{SECONDARY_GW}}->{HLTH} = $ACTIVE;
-      $msg = "$fname: FIXED previously failed ping now successful to SECGW $cfg{SECONDARY_GW}";
-      &syslog_write("info", $msg, "");
-    }
-  }
-
-# report failures/fixes for LNet routers
-
-  $num_lnet_rtrs = @LNET_RTRS;
-  for ($i=0; $i < $num_lnet_rtrs; $i++) {
-     if ($LU_Health{$LNET_RTRS[$i]}->{STAT} == $INACTIVE) {
-       $LU_Health{$LNET_RTRS[$i]}->{HLTH} = $INACTIVE;
-       $msg = "$fname: CRITICAL - lctl ping failed to LNet Router $LNET_RTRS[$i]";
-       &syslog_write("info", $msg, "");
-     } else {
-       if ($LU_Health{$LNET_RTRS[$i]}->{HLTH} == $INACTIVE) {
-         $LU_Health{$LNET_RTRS[$i]}->{HLTH} = $ACTIVE;
-         $msg = "$fname: FIXED previously failed lctl ping now successful to LNet Router $LNET_RTRS[$i]";
+    $num_lnet_rtrs = @LNET_RTRS;
+    for ($i=0; $i < $num_lnet_rtrs; $i++) {
+       if ($LU_Health{$LNET_RTRS[$i]}->{STAT} == $INACTIVE) {
+         $LU_Health{$LNET_RTRS[$i]}->{HLTH} = $INACTIVE;
+         $msg = "$fname: CRITICAL - lctl ping failed to LNet Router $LNET_RTRS[$i]";
          &syslog_write("info", $msg, "");
-       }
+       } else {
+         if ($LU_Health{$LNET_RTRS[$i]}->{HLTH} == $INACTIVE) {
+           $LU_Health{$LNET_RTRS[$i]}->{HLTH} = $ACTIVE;
+           $msg = "$fname: CRITICAL - previously failed lctl ping now successful to LNet Router $LNET_RTRS[$i]";
+           &syslog_write("info", $msg, "");
+         }
+      }
     }
   }
-
 }   
 
 #============================
@@ -483,7 +488,7 @@ sub check_connectivity {
 
   if ($key eq "CAMPUS_TO_IO_ETH") {
       if (!($SNcampus_Health{$cfg{LOCAL_CAMPUS_GW}}->{STAT} == $ACTIVE)) {
-        &syslog_write("info", "$fname: FAIL No Campus Connectivity - Ethernet Test Skipped","");
+        &syslog_write("info", "$fname: CRITICAL No Campus Connectivity - Ethernet Test Skipped","");
         return;
       }
   }
@@ -659,6 +664,13 @@ sub check_iolog {
       &syslog_write("info", "$fname: checking for file $cfg{IOLOG_FILENAME}");
     }
  
+# assume all nodes pass this test
+#   this resets previous failures
+
+    for ($i=0; $i <= $NUM_IO_NODES-1; $i++) {
+      $IOLOG_Health[$i] = $ACTIVE;
+    }
+
 # if dgd log exists, analyze it
     if ( -e $cfg{IOLOG_FILENAME} ) {
 
@@ -680,7 +692,7 @@ sub check_iolog {
          }
       }
 
-      system("/bin/rm -f $cfg{IOLOG_FILENAME}");
+      system("/bin/mv -f $cfg{IOLOG_FILENAME} $FAILED_IOLOG_FILENAME");
   }
 
 }
@@ -734,15 +746,21 @@ sub node_down {
     system("$SSH_COMMAND $IO_CVLAN_IPS[$num] $cfg{ROUTER_SVC} stop");
     system("$SSH_COMMAND $IO_CVLAN_IPS[$num] ifconfig $cfg{IB_NIC} down");
     if ($cfg{LUSTRE_SVC} ) {
-      system("$SSH_COMMAND $IO_CVLAN_IPS[$num] $cfg{LUSTRE_SVC} stop");
+      system("$SSH_COMMAND $IO_CVLAN_IPS[$num] $LUSTRE_SVC_STOP");
     }
   }
 
+# set IB and OSPF indicators to INACTIVE to appropriately reflect the state
+#   (Lustre problems do not cause removal of the gateway node)
+
+ $IB_Health{$IO_IB_IPS[$num]}->{STAT} = $INACTIVE;
+ $OSPF_Health[$num] = $INACTIVE;
+
 }
 
-#==========================================================
-# verify the status of ospf matches the state of the node
-#==========================================================
+#==============================================================
+# verify the character of the node matches the current state
+#==============================================================
 
 sub verify_node_state {
 
@@ -754,6 +772,7 @@ sub verify_node_state {
 
 # OSPF
 
+  $r = "";
   $cmd = "$SSH_COMMAND $IO_CVLAN_IPS[$num] $cfg{ROUTER_SVC} status | grep \"$grep[$state]\"";
 
   if ($cfg{DEBUG}) {
@@ -774,9 +793,10 @@ sub verify_node_state {
 
 # LUSTRE
 
+  $r = "";
   if ($cfg{LUSTRE_SVC}) {
 
-    $cmd = "$SSH_COMMAND $IO_CVLAN_IPS[$num] $cfg{LUSTRE_SVC} status | grep \"$grep[$state]\"";
+    $cmd = "$SSH_COMMAND $IO_CVLAN_IPS[$num] $LUSTRE_SVC_STATUS | grep \"$grep[$state]\"";
 
     if ($cfg{DEBUG}) {
        &syslog_write("info", "$fname: Checking status of lustre: $cmd");
@@ -785,7 +805,11 @@ sub verify_node_state {
     $r = `$cmd`;
 
     if ($cfg{DEBUG} < 2 && !($r)) {
-      $cmd = "$SSH_COMMAND $IO_CVLAN_IPS[$num] $cfg{LUSTRE_SVC} $action[$state]";
+      if ($action[$state] eq "stop") {
+        $cmd = "$SSH_COMMAND $IO_CVLAN_IPS[$num] $LUSTRE_SVC_STOP";
+      } else {
+        $cmd = "$SSH_COMMAND $IO_CVLAN_IPS[$num] $LUSTRE_SVC_START";
+      }
       system($cmd);
     }
 

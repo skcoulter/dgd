@@ -1,0 +1,95 @@
+
+Testing on <system> - <date>
+
+1.  Discovers all aspects of the IO subsystem correctly
+
+2.  All tests succeed as expected when no faults in the system
+
+3.  TEST_OSPF_LOGS
+	Correctly recognizes a fault
+		Set INACTIVE
+		Adjusts routes correctly
+	Correctly recognizes when fixed
+		Set ACTIVE
+		Adjusts routes correctly
+
+4.  TEST_COMPUTE_TO_SWITCH_GW
+	Correctly recognizes partial fault
+		Reset before failure
+	Correctly recognizes complete fault
+		Reset before failure
+	Correctly recognizes when fixed
+
+5.  TEST_COMPUTE_TO_LUSTRE
+	Correctly recognizes a fault
+	Correctly recognizes when fixed
+	Resets correctly before failure
+
+6.  TEST_IO_NODE_LOG
+	Correctly handles errors below threshold
+	Correctly handles erorrs above threshold
+		Set INACTIVE
+		Modifies routes on failure
+	Correctly recognizes fix
+		Set ACTIVE
+		Modified routes on resolution
+
+7.  TEST_CAMPUS_TO_IO_ETH
+	Correctly recognizes partial fault
+		Reset before going INACTIVE
+	Correctly recognizes complete fault
+		Reset before going INACTIVE
+	Set INACTIVE on threshold
+		Removes from routes correctly
+	Correctly recognizes when fixed
+		Set ACTIVE
+		Adds back to routes
+
+8.  TEST_INTERNAL_TO_IO_IB
+	Correctly recognizes partial fault
+		Reset before going INACTIVE
+	Correctly recognizes complete fault
+		Reset before going INACTIVE
+	Set INACTIVE on threshold
+		Removes from routes correctly
+	Correctly recognizes when fixed
+		Set ACTIVE
+		Adds back to routes
+
+9.  Correctly reports and handles no connection to campus from master
+ 
+10. Wakeup signal handled correctly (can result in 2 run loops back-to-back)
+
+11. Sleep signal handled correctly
+
+12. Config-Reread signal handled correctly
+
+13. Status signal handled correctly
+
+14. Confirm verify_node_status keeps an INACTIVE IO node down
+	HSN shut down
+	OSPF shut down
+	LNET shut down (optional)
+
+15. Skip files recognized and appropriate action taken
+	/etc/ON_DST 
+	/etc/INSANE
+
+16. INSANITY level honored correctly
+
+17. Test multiple failures at once, and insure they are handled correctly
+
+18. Test multiple failures in succession, and insure they are handled correctly
+
+19. Verify all syslog messages are accurate and expected
+
+20. Verify an extra copy of dgd.pl cannot be launched mistakenly
+
+Optional:
+
+1. Secondary GW
+
+2. Secondary IPs
+
+3. Lustre service shut down correctly
+

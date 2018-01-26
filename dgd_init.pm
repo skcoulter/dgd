@@ -78,7 +78,7 @@ sub set_environment {
 #===================  statics that depend on perceus data / configs  ==================
 
   $SSH_COMMAND = "/usr/bin/ssh -o ConnectTimeout=$cfg{SSH_TIMEOUT}";
-  $NUM_IO_NODES = `grep $cfg{IO_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | wc -l`;
+  $NUM_IO_NODES = `grep "^[[:space:]]*$cfg{NODE_PREFIX}.*$cfg{IO_IMAGE}" $nodes | wc -l`;
 
 # If multiple images, range already set
 
@@ -86,7 +86,7 @@ sub set_environment {
     $COMP_RANGE = "@".$cfg{COMPUTE_IMAGE};
   }
 
-  $NUM_COMP_NODES = `grep $cfg{COMPUTE_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | wc -l`;
+  $NUM_COMP_NODES = `grep "^[[:space:]]*$cfg{NODE_PREFIX}.*$cfg{COMPUTE_IMAGE}" $nodes | wc -l`;
 
 # Command to re-run ethcfg
 
@@ -130,18 +130,18 @@ sub set_environment {
 
 #===================   IP address arrays   ============================
 
-  @IO_IB_IPS = split(/\n/,`for x in \`grep $cfg{IO_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{IB_NIC} | grep address | sed 's/.*has address //'\;done`);
+  @IO_IB_IPS = split(/\n/,`for x in \`grep "^[[:space:]]*$cfg{NODE_PREFIX}.*$cfg{IO_IMAGE}" $nodes | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{IB_NIC} | grep address | sed 's/.*has address //'\;done`);
 
-  @IO_CVLAN_IPS = split(/\n/,`for x in \`grep $cfg{IO_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_io | xargs\`\; do host \${x} | grep address | sed 's/.*has address //'\;done`);
+  @IO_CVLAN_IPS = split(/\n/,`for x in \`grep "^[[:space:]]*$cfg{NODE_PREFIX}.*$cfg{IO_IMAGE}" $nodes | cut $cut_param_io | xargs\`\; do host \${x} | grep address | sed 's/.*has address //'\;done`);
 
-  @IO_TENGIG_IPS = split(/\n/,`for x in \`grep $cfg{IO_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{IO_CAMPUS_NIC} | grep address | sed 's/.*has address //'\;done`);
+  @IO_TENGIG_IPS = split(/\n/,`for x in \`grep "^[[:space:]]*$cfg{NODE_PREFIX}.*$cfg{IO_IMAGE}" $nodes | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{IO_CAMPUS_NIC} | grep address | sed 's/.*has address //'\;done`);
 
-  @COMPUTE_IB_IPS = split(/\n/,`for x in \`grep $cfg{COMPUTE_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_comp | xargs\`\; do host \${x}-$cfg{IB_NIC} | grep address | sed 's/.*has address //'\;done`);
+  @COMPUTE_IB_IPS = split(/\n/,`for x in \`grep "^[[:space:]]*$cfg{NODE_PREFIX}.*$cfg{COMPUTE_IMAGE}" $nodes | cut $cut_param_comp | xargs\`\; do host \${x}-$cfg{IB_NIC} | grep address | sed 's/.*has address //'\;done`);
 
-  @COMPUTE_CVLAN_IPS = split(/\n/,`for x in \`grep $cfg{COMPUTE_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_comp | xargs\`\; do host \${x} | grep address | sed 's/.*has address //'\;done`);
+  @COMPUTE_CVLAN_IPS = split(/\n/,`for x in \`grep "^[[:space:]]*$cfg{NODE_PREFIX}.*$cfg{COMPUTE_IMAGE}" $nodes | cut $cut_param_comp | xargs\`\; do host \${x} | grep address | sed 's/.*has address //'\;done`);
 
   if ($cfg{SECONDARY_NIC}) {
-    @IO_SEC_IPS = split(/\n/,`for x in \`grep $cfg{IO_IMAGE} $nodes | grep $cfg{NODE_PREFIX} | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{SECONDARY_NIC} | grep address | sed 's/.*has address //'\;done`);
+    @IO_SEC_IPS = split(/\n/,`for x in \`grep "^[[:space:]]*$cfg{NODE_PREFIX}.*$cfg{IO_IMAGE}" $nodes | cut $cut_param_io | xargs\`\; do host \${x}-$cfg{SECONDARY_NIC} | grep address | sed 's/.*has address //'\;done`);
   }
 
 # verify IO node arrays have the correct number of entries

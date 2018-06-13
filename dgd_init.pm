@@ -30,6 +30,7 @@ use Sys::Syslog;
 sub set_environment {
   my $fname = "set_environment";
   my ($svc,$unit,$unit1,$unit2);
+  my $rc = 0;
 
   &check_status;
 
@@ -146,14 +147,25 @@ sub set_environment {
 
 # verify IO node arrays have the correct number of entries
 
+  &syslog_write("info","$fname: Number of IO nodes is $NUM_IO_NODES");
+  my $scalarnum = scalar(@IO_IB_IPS);
+  &syslog_write("info","$fname: Number of IO IB IPs is $scalarnum");
+  my $scalarnum = scalar(@IO_CVLAN_IPS);
+  &syslog_write("info","$fname: Number of IO CVLAN IPs is $scalarnum");
+  my $scalarnum = scalar(@IO_TENGIG_IPS);
+  &syslog_write("info","$fname: Number of IO Ethernet IPs is $scalarnum");
+
   if (scalar(@IO_IB_IPS) != $NUM_IO_NODES) {
-    &syslog_write("info","$fname: CRITICAL Number of IO node IB IPs does not match NUM_IO_NODES");
+    &syslog_write("info","$fname: FAIL Number of IO node IB IPs does not match NUM_IO_NODES");
+    $rc = 1;
   }
   if (scalar(@IO_CVLAN_IPS) != $NUM_IO_NODES) {
-    &syslog_write("info","$fname: CRITICAL Number of IO node CVLAN IPs does not match NUM_IO_NODES");
+    &syslog_write("info","$fname: FAIL Number of IO node CVLAN IPs does not match NUM_IO_NODES");
+    $rc = 1;
   }
   if (scalar(@IO_TENGIG_IPS) != $NUM_IO_NODES) {
-    &syslog_write("info","$fname: CRITICAL Number of IO node Ethernet IPs does not match NUM_IO_NODES");
+    &syslog_write("info","$fname: FAIL Number of IO node Ethernet IPs does not match NUM_IO_NODES");
+    $rc = 1;
   }
 
 # array of IO gateways
@@ -230,6 +242,7 @@ sub set_environment {
     }
   }
 
+  return $rc;
 }
 
 #=========================================  

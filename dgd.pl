@@ -130,12 +130,25 @@ our %SNcampus_Health;
 our %TenGig_Health;
 
 my $fname = "main";
+my $env_rc = 1;
+my $env_fail_cnt = 0;
 
 #=====================================================
 
 $SLEEPING = 0;
 
-&set_environment;
+while ( $env_rc ) {
+   sleep 10;
+   $env_rc = &set_environment;
+   if ($env_rc) {
+      $env_fail_cnt++;
+      &syslog_write("info","$fname: FAIL set_environment failed, sleeping 10 seconds and will retry");
+   }
+}   
+
+if ($env_fail_cnt) {
+   &syslog_write("info","$fname: FAIL RESOLVED, set_environment succeeded");
+}
 
 &initialize;
 
